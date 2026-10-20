@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, maxPayload: 1024 });
 
 // Роздаємо статичні файли гри з папки public
-app.use(express.static(__dirname));
+  app.use(express.static(__dirname));
 
 let nextId = 1;
 
@@ -29,12 +29,27 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         let d;
         try { d = JSON.parse(message.toString()); } catch (e) { return; }
-        if (!d || ![d.x, d.y, d.z, d.rotY].every(Number.isFinite)) return;
+        if (!d || typeof d !== 'object') return;
+
+        // Чат: чистимо текст, обмежуємо частоту, розсилаємо всім (і відправнику теж)
+        if (d.type === 'chat') {
+            const now = Date.now();
+            if (now - (ws.lastChat || 0) < 400) return;
+            const text = typeof d.t === 'string' ? d.t.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 120) : '';
+            if (!text) return;
+            ws.lastChat = now;
+            const nick = typeof d.n === 'string' ? d.n.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16) : '';
+            broadcast(JSON.stringify({ type: 'chat', id: ws.id, n: nick, t: text }), null);
+            return;
+        }
+
+        if (![d.x, d.y, d.z, d.rotY].every(Number.isFinite)) return;
         // Пересилаємо координати всім іншим гравцям (id ставить сервер, а не клієнт)
         broadcast(JSON.stringify({
             type: 'pos',
             id: ws.id,
             x: d.x, y: d.y, z: d.z, rotY: d.rotY,
+            n: typeof d.n === 'string' ? d.n.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16) : '',
             vis: d.vis ? 1 : 0
         }), ws);
     });
@@ -48,5 +63,4 @@ wss.on('connection', (ws) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Сервер запущено на порту ${PORT}`);
-});
+    console.log(`Сервер запущено на порту ${POR
