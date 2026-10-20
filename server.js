@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, maxPayload: 1024 });
 
 // Роздаємо статичні файли гри з папки public
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 let nextId = 1;
 
