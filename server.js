@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -22,6 +21,7 @@ function broadcast(data, except) {
 }
 
 wss.on('connection', (ws) => {
+    // Сервер сам видає кожному гравцю id
     ws.id = String(nextId++);
     console.log('Новий гравець підключився:', ws.id);
     ws.send(JSON.stringify({ type: 'welcome', id: ws.id }));
@@ -31,9 +31,10 @@ wss.on('connection', (ws) => {
         try { d = JSON.parse(message.toString()); } catch (e) { return; }
         if (!d || typeof d !== 'object') return;
 
+        // Чат: чистимо текст, обмежуємо частоту, розсилаємо всім (і відправнику теж)
         if (d.type === 'chat') {
             const now = Date.now();
-            if (now - (ws.lastChat || 0) < 400) return;
+            if (now - (ws.lastChat || 0) < 400) return; // анти-спам
             const text = typeof d.t === 'string' ? d.t.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 120) : '';
             if (!text) return;
             ws.lastChat = now;
@@ -42,6 +43,7 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // Синхронізація позиції
         if (![d.x, d.y, d.z, d.rotY].every(Number.isFinite)) return;
         broadcast(JSON.stringify({
             type: 'pos',
@@ -54,6 +56,7 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         console.log('Гравець відключився:', ws.id);
+        // Кажемо іншим гравцям, щоб видалили його модель
         broadcast(JSON.stringify({ type: 'leave', id: ws.id }), ws);
     });
 });
